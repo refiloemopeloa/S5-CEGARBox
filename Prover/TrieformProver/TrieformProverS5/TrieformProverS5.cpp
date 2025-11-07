@@ -256,13 +256,13 @@ Solution TrieformProverS5::prove(vector<shared_ptr<Bitset>> history,
       // Run the solver for the next level
       history.push_back(assumptionsBitset);
       Solution childSolution;
-      if (getLevel() == 1) {
-        childSolution = prove(history, childAssumptions);
-      } else {
+      // if (getLevel() == 1) {
+      //   childSolution = prove(history, childAssumptions);
+      // } else {
         childSolution = dynamic_cast<TrieformProverS5 *>(
                             subtrieMap[modalityDiamonds.first].get())
                             ->prove(history, childAssumptions);
-      }
+      // }
       history.pop_back();
 
       // If it is satisfiable create the next world
