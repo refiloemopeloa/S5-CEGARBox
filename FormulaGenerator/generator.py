@@ -9,6 +9,7 @@ import argparse
 import json
 import sys
 
+max_depth = 2
 
 def rnd_sign():
     """Select randomly either positive or negative sign with equal probability."""
@@ -27,59 +28,79 @@ def rnd_box(m):
 
 def rnd_length(d, C):
     """Select randomly the clause length according to the d+1-th distribution in C."""
-    if d >= len(C):
-        return 3  # Default to 3 if no distribution available
     
     dist = C[d]
-    total = sum(dist)
     
-    if total == 0:
-        return len(dist)
+    length = random.choices([x for x in range(len(dist))],dist)
     
-    r = random.random() * total
-    cumulative = 0
+    return length[0]
     
-    for i, val in enumerate(dist):
-        cumulative += val
-        if r <= cumulative:
-            return i + 1
+    # check random.choices
+    # if d >= len(C):
+    #     return 3  # Default to 3 if no distribution available
     
-    return len(dist)
+    # dist = C[d]
+    # total = sum(dist)
+    
+    # if total == 0:
+    #     return len(dist)
+    
+    # r = random.random() * total
+    # cumulative = 0
+    
+    # for i, val in enumerate(dist):
+    #     cumulative += val
+    #     if r <= cumulative:
+    #         return i + 1
+    
+    # return len(dist)
 
 
 def rnd_propnum(d, p, K):
     """Select randomly the number of propositional atoms per clause P."""
-    if d >= len(p):
-        return 0
     
     depth_dist = p[d]
+    
     if K - 1 >= len(depth_dist):
         return 0
     
-    length_dist = depth_dist[K - 1]
-    total = sum(length_dist)
+    dist = depth_dist[K - 1]
     
-    if total == 0:
-        return 0
+    length = random.choices([x for x in range(len(dist))],dist)
     
-    r = random.random() * total
-    cumulative = 0
+    return length[0]
     
-    for i, val in enumerate(length_dist):
-        cumulative += val
-        if r <= cumulative:
-            return i
+    # if d >= len(p):
+    #     return 0
     
-    return 0
+    # depth_dist = p[d]
+    # if K - 1 >= len(depth_dist):
+    #     return 0
+    
+    # length_dist = depth_dist[K - 1]
+    # total = sum(length_dist)
+    
+    # if total == 0:
+    #     return 0
+    
+    # r = random.random() * total
+    # cumulative = 0
+    
+    # for i, val in enumerate(length_dist):
+    #     cumulative += val
+    #     if r <= cumulative:
+    #         return i
+    
+    # return 0
 
 
 def rnd_atom(d, m, N, p, C):
     """Generate a random atom at depth d."""
-    if d == 0:
+    if d == max_depth:
         return rnd_propositional_atom(N)
     else:
         box = rnd_box(m)
-        clause = rnd_clause(d - 1, m, N, p, C)
+        clause = rnd_clause(d + 1, m, N, p, C)
         return f"{box}({clause})"
 
 
@@ -100,21 +121,21 @@ def rnd_clause(d, m, N, p, C):
     max_attempts = 100
     attempts = 0
     
-    while attempts < max_attempts:
-        K = rnd_length(d, C)
+    while True:
+        K = rnd_length(d, C) + 1
         P = rnd_propnum(d, p, K)
         
         clause = []
         
         # Generate P propositional literals
         for j in range(P):
-            atom = rnd_propositional_atom(N)
+            atom = rnd_atom(max_depth, m, N, p, C)
             sign = rnd_sign()
             literal = f"¬{atom}" if sign else atom
             clause.append(literal)
         
         # Generate K-P modal literals
-        for j in range(P, K):
+        for j in range(K-P):
             atom = rnd_atom(d, m, N, p, C)
             sign = rnd_sign()
             literal = f"¬{atom}" if sign else atom
@@ -124,7 +145,7 @@ def rnd_clause(d, m, N, p, C):
             return ' ∨ '.join(sorted(clause))
         
         attempts += 1
-    
+
     # If we can't generate a valid clause, return what we have
     return ' ∨ '.join(sorted(clause))
 
@@ -140,7 +161,7 @@ def rnd_CNF(d, m, L, N, p, C):
     max_attempts = L * 10
     attempts = 0
     
-    while len(clauses) < L and attempts < max_attempts:
+    while len(clauses) < L: # and attempts < max_attempts:
         clause = rnd_clause(d, m, N, p, C)
         if is_new(clause, clauses):
             clauses.append(clause)
@@ -200,7 +221,7 @@ Notation:
         """
     )
     
-    parser.add_argument('-d', '--depth', type=int, default=2,
+    parser.add_argument('-d', '--depth', type=int, default=max_depth,
                         help='Modal depth (default: 2)')
     parser.add_argument('-L', '--clauses', type=int, default=4,
                         help='Number of clauses (default: 4)')
@@ -210,8 +231,8 @@ Notation:
                         help='Number of box symbols (default: 1)')
     parser.add_argument('-C', '--clause-dist', type=str, default='[[0,2,2],[2,4],[6]]',
                         help='Clause length distribution (default: [[0,2,2],[2,4],[6]])')
-    parser.add_argument('-p', '--prop-dist', type=str, default='[[[],[0,2,0],[0,2,0,0]],[[2,0],[0,4,0]]]',
-                        help='Propositional/modal rate distribution (default: [[[],[0,2,0],[0,2,0,0]],[[2,0],[0,4,0]]])')
+    parser.add_argument('-p', '--prop-dist', type=str, default='[[[0],[0,2,0],[0,2,0,0]],[[2,0],[0,4,0]],[]]',
+                        help='Propositional/modal rate distribution (default: [[[],[0,2,0],[0,2,0,0]],[[2,0],[0,4,0]],[]])')
     parser.add_argument('-o', '--output', type=str,
                         help='Output file (default: print to stdout)')
     parser.add_argument('--count', type=int, default=1,
@@ -269,7 +290,7 @@ Notation:
         if args.count > 1:
             output_lines.append(f"=== Formula {i + 1} ===")
         
-        clauses = rnd_CNF(args.depth, args.boxes, args.clauses, args.variables, p, C)
+        clauses = rnd_CNF(0, args.boxes, args.clauses, args.variables, p, C)
         formula = format_formula(clauses)
         output_lines.append(formula)
         
