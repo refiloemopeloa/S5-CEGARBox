@@ -18,6 +18,8 @@ protected:
   static unsigned int assumptionsSize;
   static GlobalSolutionMemo globalMemo;
   static unordered_map<string, unsigned int> idMap;
+  // ADD a helper or member to track if this node is the universal fixpoint
+  bool isUniversal = false;
 
   shared_ptr<Bitset> convertAssumptionsToBitset(literal_set literals);
   void updateSolutionMemo(const shared_ptr<Bitset> &assumptions,
