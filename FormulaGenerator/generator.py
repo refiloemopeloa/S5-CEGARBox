@@ -9,8 +9,6 @@ import argparse
 import json
 import sys
 
-max_depth = 2
-
 def rnd_sign():
     """Select randomly either positive or negative sign with equal probability."""
     return random.random() < 0.5
@@ -29,15 +27,18 @@ def rnd_box(m):
 def rnd_length(d, C):
     """Select randomly the clause length according to the d+1-th distribution in C."""
     
+    if d >= len(C):
+        return 3  # Default to 3 if no distribution available
+    
     dist = C[d]
+    
+    if len(dist) == 0:
+        return 0
     
     length = random.choices([x for x in range(len(dist))],dist)
     
     return length[0]
-    
     # check random.choices
-    # if d >= len(C):
-    #     return 3  # Default to 3 if no distribution available
     
     # dist = C[d]
     # total = sum(dist)
@@ -59,6 +60,9 @@ def rnd_length(d, C):
 def rnd_propnum(d, p, K):
     """Select randomly the number of propositional atoms per clause P."""
     
+    # if d >= len(p):
+    #     return K
+    
     depth_dist = p[d]
     
     if K - 1 >= len(depth_dist):
@@ -70,8 +74,6 @@ def rnd_propnum(d, p, K):
     
     return length[0]
     
-    # if d >= len(p):
-    #     return 0
     
     # depth_dist = p[d]
     # if K - 1 >= len(depth_dist):
@@ -94,13 +96,13 @@ def rnd_propnum(d, p, K):
     # return 0
 
 
-def rnd_atom(d, m, N, p, C):
+def rnd_atom(d, m, N, p, C, max_depth):
     """Generate a random atom at depth d."""
     if d == max_depth:
         return rnd_propositional_atom(N)
     else:
         box = rnd_box(m)
-        clause = rnd_clause(d + 1, m, N, p, C)
+        clause = rnd_clause(d + 1, m, N, p, C, max_depth)
         return f"{box}({clause})"
 
 
@@ -116,7 +118,7 @@ def no_repeated_atoms_in(clause):
     return True
 
 
-def rnd_clause(d, m, N, p, C):
+def rnd_clause(d, m, N, p, C, max_depth):
     """Generate a random clause at depth d."""
     max_attempts = 100
     attempts = 0
@@ -129,14 +131,14 @@ def rnd_clause(d, m, N, p, C):
         
         # Generate P propositional literals
         for j in range(P):
-            atom = rnd_atom(max_depth, m, N, p, C)
+            atom = rnd_atom(max_depth, m, N, p, C, max_depth)
             sign = rnd_sign()
             literal = f"¬{atom}" if sign else atom
             clause.append(literal)
         
         # Generate K-P modal literals
         for j in range(K-P):
-            atom = rnd_atom(d, m, N, p, C)
+            atom = rnd_atom(d, m, N, p, C, max_depth)
             sign = rnd_sign()
             literal = f"¬{atom}" if sign else atom
             clause.append(literal)
@@ -155,14 +157,14 @@ def is_new(clause, existing_clauses):
     return clause not in existing_clauses
 
 
-def rnd_CNF(d, m, L, N, p, C):
+def rnd_CNF(d, m, L, N, p, C, max_depth):
     """Generate L distinct random clauses and form their conjunction."""
     clauses = []
     max_attempts = L * 10
     attempts = 0
     
     while len(clauses) < L: # and attempts < max_attempts:
-        clause = rnd_clause(d, m, N, p, C)
+        clause = rnd_clause(d, m, N, p, C, max_depth)
         if is_new(clause, clauses):
             clauses.append(clause)
         attempts += 1
@@ -177,10 +179,11 @@ def format_formula(clauses):
     
     lines = []
     for i, clause in enumerate(clauses):
-        connector = ' ∧' if i < len(clauses) - 1 else '.'
-        lines.append(f"  ({clause}){connector}")
+        connector = ' ∧' if i < len(clauses) - 1 else ''
+        lines.append(f" ({clause}){connector}")
     
-    return '\n'.join(lines)
+    return ''.join(lines)
+    # return '\n'.join(lines)
 
 
 def parse_distribution(dist_str):
@@ -220,6 +223,9 @@ Notation:
   ∧ = conjunction (AND)
         """
     )
+
+    max_depth = 2
+    
     
     parser.add_argument('-d', '--depth', type=int, default=max_depth,
                         help='Modal depth (default: 2)')
@@ -270,6 +276,8 @@ Notation:
         print("Error: number of boxes must be at least 1", file=sys.stderr)
         sys.exit(1)
     
+    max_depth = args.depth
+    
     # Print parameters if verbose
     if args.verbose:
         print("Parameters:")
@@ -287,10 +295,10 @@ Notation:
     output_lines = []
     
     for i in range(args.count):
-        if args.count > 1:
-            output_lines.append(f"=== Formula {i + 1} ===")
+        # if args.count > 1:
+        #     output_lines.append(f"=== Formula {i + 1} ===")
         
-        clauses = rnd_CNF(0, args.boxes, args.clauses, args.variables, p, C)
+        clauses = rnd_CNF(0, args.boxes, args.clauses, args.variables, p, C, max_depth)
         formula = format_formula(clauses)
         output_lines.append(formula)
         
@@ -302,7 +310,7 @@ Notation:
     # Write output
     if args.output:
         try:
-            with open(args.output, 'w', encoding='utf-8') as f:
+            with open(args.output, 'a', encoding='utf-8') as f:
                 f.write(output_text)
             print(f"Formula saved to {args.output}")
         except IOError as e:
