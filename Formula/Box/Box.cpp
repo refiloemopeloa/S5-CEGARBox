@@ -1,6 +1,31 @@
 #include "Box.h"
 
+//ADDED S5 INDICATOR HERE
+Box::Box(int modality, int power, shared_ptr<Formula> subformula, bool isS5) {
+  
+  modality_ = modality;
+  power_ = power;
+  isS5Mode = isS5; //SETTING INDICATOR
+
+  Box *boxFormula = dynamic_cast<Box *>(subformula.get());
+  if (boxFormula) {
+    if (boxFormula->getModality() == modality_) {
+      power_ += boxFormula->getPower();
+      subformula_ = boxFormula->getSubformula();
+    } else {
+      subformula_ = subformula;
+    }
+  } else {
+    subformula_ = subformula;
+  }
+  std::hash<FormulaType> ftype_hash;
+  std::hash<int> int_hash;
+  size_t totalHash = ftype_hash(getType());
+  boxHash_ = totalHash + int_hash(modality_) + int_hash(power_) + subformula_->hash();
+}
+
 Box::Box(int modality, int power, shared_ptr<Formula> subformula) {
+  
   modality_ = modality;
   power_ = power;
 
@@ -21,11 +46,14 @@ Box::Box(int modality, int power, shared_ptr<Formula> subformula) {
   boxHash_ = totalHash + int_hash(modality_) + int_hash(power_) + subformula_->hash();
 }
 
+
 Box::~Box() {
 #if DEBUG_DESTRUCT
   cout << "DESTRUCTING BOX" << endl;
 #endif
 }
+
+bool Box::getIsS5Mode() const { return isS5Mode; } //ADDED THIS
 
 int Box::getModality() const { return modality_; }
 
@@ -49,49 +77,78 @@ shared_ptr<Formula> Box::negatedNormalForm() {
   return shared_from_this();
 }
 
-
 shared_ptr<Formula> Box::tailNormalForm() {
     assert (1 == 0);
 }
 
+//ADDED S5 INDICATOR HERE
 shared_ptr<Formula> Box::negate() {
-  return Diamond::create(modality_, power_, subformula_->negate());
+  return Diamond::create(modality_, power_, subformula_->negate(), getIsS5Mode());
+
 }
 
-
-// In Box::simplify()
+//SEND TO S5SIMPLIFY IF NECESSARY
 shared_ptr<Formula> Box::simplify() {
-  shared_ptr<Formula> new_subformula = subformula_->simplify();
-  
-  // S5 reductions
-  if (true) {
-    // □◇φ → ◇φ
-    if (new_subformula->getType() == FDiamond) {
-      Diamond* diamond = dynamic_cast<Diamond*>(new_subformula.get());
-      return Diamond::create(diamond->getModality(),
-                           getPower() + diamond->getPower(),
-                           diamond->getSubformula())->simplify();
+
+  if (getIsS5Mode()) return simplifyS5();
+
+  subformula_ = subformula_->simplify();
+
+  switch (subformula_->getType()) {
+  case FTrue:
+    return True::create();
+  case FBox: {
+    Box *boxFormula = dynamic_cast<Box *>(subformula_.get());
+    if (boxFormula->getModality() == modality_) {
+      power_ += boxFormula->getPower();
+      subformula_ = boxFormula->getSubformula();
     }
-    
-    // □□φ → □φ
-    if (new_subformula->getType() == FBox) {
-      Box* innerBox = dynamic_cast<Box*>(new_subformula.get());
-      if (innerBox->getModality() == getModality()) {
-        return Box::create(getModality(), getPower() + innerBox->getPower(),
-                         innerBox->getSubformula())->simplify();
-      }
+    return shared_from_this();
+  }
+
+  default:
+    return shared_from_this();
+  }
+}
+
+//S5 SIMPLIFY
+shared_ptr<Formula> Box::simplifyS5() {
+
+  shared_ptr<Formula> newSubformula = subformula_->simplify();
+  
+  //□◇φ → ◇φ
+  if (newSubformula->getType() == FDiamond) {
+    Diamond* diamond = dynamic_cast<Diamond*>(newSubformula.get());
+
+    return Diamond::create(diamond->getModality(),
+      getPower() + diamond->getPower(),
+      diamond->getSubformula(),
+      getIsS5Mode()
+    )->simplify();
+  }
+  
+  //□□φ → □φ
+  if (newSubformula->getType() == FBox) {
+    Box* innerBox = dynamic_cast<Box*>(newSubformula.get());
+
+    if (innerBox->getModality() == getModality()) {
+      return Box::create(getModality(),
+        getPower() + innerBox->getPower(),
+        innerBox->getSubformula(),
+        getIsS5Mode()
+      )->simplify();
     }
   }
-  std::vector<int> myIntVector;
-  myIntVector.push_back(getModality());
+  
 
-  if (subformula_ != new_subformula) {
-    return Box::create(myIntVector, new_subformula);
+  std::vector<int> modalityVec;
+  modalityVec.push_back(getModality());
+
+  if (subformula_ != newSubformula) {
+    return Box::create(modalityVec, newSubformula, getIsS5Mode());
   }
   return shared_from_this();
 }
-
-
 
 shared_ptr<Formula> Box::modalFlatten() {
   subformula_ = subformula_->modalFlatten();
@@ -135,21 +192,50 @@ shared_ptr<Formula> Box::create(vector<int> modality,
   return formula;
 }
 
+//CREATES S5 BOX
+shared_ptr<Formula> Box::create(int modality, int power,
+                                const shared_ptr<Formula> &subformula, bool isS5) {
+  if (power == 0) {
+    return subformula;
+  }
+  return shared_ptr<Formula>(new Box(modality, power, subformula, isS5));
+}
+
+//CREATES S5 BOX
+shared_ptr<Formula> Box::create(vector<int> modality,
+                                const shared_ptr<Formula> &subformula,bool isS5) {
+  if (modality.size() == 0) {
+    return subformula;
+  }
+  shared_ptr<Formula> formula =
+      Box::create(modality[modality.size() - 1], 1, subformula, isS5);
+  for (size_t i = modality.size() - 1; i > 0; i--) {
+    formula = Box::create(modality[i - 1], 1, formula, isS5);
+  }
+  return formula;
+}
+
+//ADDED S5 INDICATOR HERE
 shared_ptr<Formula> Box::constructBoxReduced() const {
-  return Box::create(modality_, power_ - 1, subformula_);
+  return Box::create(modality_, power_ - 1, subformula_, getIsS5Mode());
+
 }
 
+//ADDED S5 INDICATOR HERE
 shared_ptr<Formula> Box::clone() const {
-  return create(modality_, power_, subformula_->clone());
+  return create(modality_, power_, subformula_->clone(), getIsS5Mode());
 }
 
+//ADDED S5 INDICATOR HERE
 bool Box::operator==(const Formula &other) const {
   if (other.getType() != getType()) {
     return false;
   }
   const Box *otherBox = dynamic_cast<const Box *>(&other);
-  return modality_ == otherBox->modality_ && power_ == otherBox->power_ &&
-         *subformula_ == *(otherBox->subformula_);
+  return modality_ == otherBox->modality_ &&
+         power_ == otherBox->power_ &&
+         *subformula_ == *(otherBox->subformula_),
+         isS5Mode == otherBox->isS5Mode;
 }
 
 bool Box::operator!=(const Formula &other) const {

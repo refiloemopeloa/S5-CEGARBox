@@ -21,16 +21,20 @@ using namespace std;
 
 class ParseFormula {
 private:
-
-  shared_ptr<Formula> reduceS5Box(shared_ptr<Formula> formula);
-  shared_ptr<Formula> reduceS5Diamond(shared_ptr<Formula> formula);
+  
   shared_ptr<Formula> parseIff();
   shared_ptr<Formula> parseImp();
   shared_ptr<Formula> parseOr();
   shared_ptr<Formula> parseAnd();
   shared_ptr<Formula> parseRest();
 
-  bool isS5Mode = false;
+  //BASIC S5 REDUCTIONS DONE DURING PARSING
+    //NOT NECESSARY BUT DOES MAKE IT FASTER
+  shared_ptr<Formula> reduceS5(shared_ptr<Formula> formula);
+  shared_ptr<Formula> reduceS5Box(shared_ptr<Formula> formula);
+  shared_ptr<Formula> reduceS5Diamond(shared_ptr<Formula> formula);
+
+  bool isS5Mode = false; //USED IN CONDITIONALS 
 
   char getChar();
 
@@ -44,8 +48,7 @@ public:
   ~ParseFormula();
 
   shared_ptr<Formula> parseFormula();
-  void setS5Mode(bool mode) { isS5Mode = mode; }
-  shared_ptr<Formula> reduceS5(shared_ptr<Formula> formula);
+  void setS5Mode(bool mode) { isS5Mode = mode; } //SETS S5
 };
 
 #endif
