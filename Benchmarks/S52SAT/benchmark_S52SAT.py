@@ -132,7 +132,7 @@ def run_s52sat_on_formula(formula, s52sat_path, cli_args, verbose=False):
             cmd,
             capture_output=True,
             text=True,
-            timeout=600  # 10 minute timeout
+            timeout=300  # 10 minute timeout
         )
         
         # Get output
@@ -275,9 +275,16 @@ def run_configuration(input_file, s52sat_path, cli_args, output_file, config_nam
         print(f"Error reading formulas: {e}", file=sys.stderr)
         return
     
+    # Clear output file at the start
+    # try:
+    #     with open(output_file, 'w', encoding='utf-8') as f:
+    #         pass  # Create empty file or clear existing one
+    # except Exception as e:
+    #     print(f"Error creating output file: {e}", file=sys.stderr)
+    #     return
+    
     # Run s52sat on each formula separately
     print(f"Running s52sat on each formula...")
-    parsed_results = []
     
     for i, formula in enumerate(formulas, 1):
         print(f"  Processing formula {i}/{len(formulas)}...")
@@ -285,27 +292,25 @@ def run_configuration(input_file, s52sat_path, cli_args, output_file, config_nam
             print(f"    Formula: {formula[:60]}{'...' if len(formula) > 60 else ''}")
         
         parsed = run_s52sat_on_formula(formula, s52sat_path, cli_args, verbose)
-        parsed_results.append(parsed)
         
-        print(f"  ✓ Formula {i} complete: {parsed.get('status', 'Unknown')}")
+        formatted_result = format_results(formula, parsed)
+        
+        # Append result to file immediately
+        try:
+            with open(output_file, 'a', encoding='utf-8') as f:
+                if i > 1:
+                    f.write('\n\n')  # Add separator between results
+                f.write(formatted_result)
+                f.write('\n')
+            
+            print(f"  ✓ Formula {i} complete: {parsed.get('status', 'Unknown')} (written to {output_file})")
+            
+        except Exception as e:
+            print(f"  Error writing result for formula {i}: {e}", file=sys.stderr)
+            # Continue processing remaining formulas
     
-    # Format and write results
-    formatted_results = []
-    for formula, parsed in zip(formulas, parsed_results):
-        formatted = format_results(formula, parsed)
-        formatted_results.append(formatted)
-    
-    # Write to file
-    try:
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write('\n\n'.join(formatted_results))
-            f.write('\n')
-        
-        print(f"✓ Results written to: {output_file}")
-        print(f"✓ Processed {len(formulas)} formula(s)")
-        
-    except Exception as e:
-        print(f"Error writing results: {e}", file=sys.stderr)
+    print(f"✓ Results written to: {output_file}")
+    print(f"✓ Processed {len(formulas)} formula(s)")
 
 
 def main():
@@ -348,35 +353,35 @@ Examples:
     print(f"Input file: {args.input}")
     print(f"s52sat executable: {args.s52sat}")
     
-    # Configuration 1: -nbModals
-    run_configuration(
-        args.input,
-        args.s52sat,
-        ['-nbModals'],
-        'benchmark_s52sat_nbModals.txt',
-        'nbModals',
-        args.verbose
-    )
+    # # Configuration 1: -nbModals
+    # run_configuration(
+    #     args.input,
+    #     args.s52sat,
+    #     ['-nbModals'],
+    #     'benchmark_s52sat_nbModals.txt',
+    #     'nbModals',
+    #     args.verbose
+    # )
     
-    # Configuration 2: -nbModals -caching
-    run_configuration(
-        args.input,
-        args.s52sat,
-        ['-nbModals', '-caching'],
-        'benchmark_s52sat_nbModals_caching.txt',
-        'nbModals + caching',
-        args.verbose
-    )
+    # # Configuration 2: -nbModals -caching
+    # run_configuration(
+    #     args.input,
+    #     args.s52sat,
+    #     ['-nbModals', '-caching'],
+    #     'benchmark_s52sat_nbModals_caching.txt',
+    #     'nbModals + caching',
+    #     args.verbose
+    # )
     
-    # Configuration 3: -diamondDegree
-    run_configuration(
-        args.input,
-        args.s52sat,
-        ['-diamondDegree'],
-        'benchmark_s52sat_diamondDegree.txt',
-        'diamondDegree',
-        args.verbose
-    )
+    # # Configuration 3: -diamondDegree
+    # run_configuration(
+    #     args.input,
+    #     args.s52sat,
+    #     ['-diamondDegree'],
+    #     'benchmark_s52sat_diamondDegree.txt',
+    #     'diamondDegree',
+    #     args.verbose
+    # )
     
     # Configuration 4: -diamondDegree -caching
     run_configuration(

@@ -189,9 +189,15 @@ Examples:
         print(f"Error reading formulas: {e}", file=sys.stderr)
         sys.exit(1)
     
-    # Process each formula
-    results = []
+    # # Clear output file at the start
+    # try:
+    #     with open(output_file, 'w', encoding='utf-8') as f:
+    #         pass  # Create empty file or clear existing one
+    # except Exception as e:
+    #     print(f"Error creating output file: {e}", file=sys.stderr)
+    #     sys.exit(1)
     
+    # Process each formula
     for i, formula in enumerate(formulas, 1):
         print(f"Processing formula {i}/{len(formulas)}...")
         if args.verbose:
@@ -204,22 +210,23 @@ Examples:
         )
         
         formatted_result = format_results(formula, status, total_time)
-        results.append(formatted_result)
         
-        print(f"✓ Formula {i} complete: {status}\n")
+        # Append result to file immediately
+        try:
+            with open(output_file, 'a', encoding='utf-8') as f:
+                if i > 1:
+                    f.write('\n\n')  # Add separator between results
+                f.write(formatted_result)
+                f.write('\n')
+            
+            print(f"✓ Formula {i} complete: {status} (written to {output_file})\n")
+            
+        except Exception as e:
+            print(f"Error writing result for formula {i}: {e}", file=sys.stderr)
+            # Continue processing remaining formulas
     
-    # Write results to file
-    try:
-        with open(output_file, 'w', encoding='utf-8') as f:
-            f.write('\n\n'.join(results))
-            f.write('\n')
-        
-        print(f"✓ Results written to: {output_file}")
-        print(f"✓ Processed {len(formulas)} formula(s)")
-        
-    except Exception as e:
-        print(f"Error writing results: {e}", file=sys.stderr)
-        sys.exit(1)
+    print(f"✓ All results written to: {output_file}")
+    print(f"✓ Processed {len(formulas)} formula(s)")
 
 
 if __name__ == "__main__":
