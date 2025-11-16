@@ -57,24 +57,33 @@ shared_ptr<Formula> Diamond::negate() {
 }
 
 shared_ptr<Formula> Diamond::simplify() {
-  subformula_ = subformula_->simplify();
-
-  switch (subformula_->getType()) {
-  case FFalse:
-    return False::create();
-  case FDiamond: {
-    Diamond *diamondFormula = dynamic_cast<Diamond *>(subformula_.get());
-    if (diamondFormula->getModality() == modality_) {
-      power_ += diamondFormula->getPower();
-      subformula_ = diamondFormula->getSubformula();
+    shared_ptr<Formula> new_subformula = subformula_->simplify();
+    
+    // S5 reduction: ◇□φ → □φ
+    if (new_subformula->getType() == FBox) {
+        Box* box = dynamic_cast<Box*>(new_subformula.get());
+        // Recursively simplify the result
+        return Box::create(box->getModality(),
+                         getPower() + box->getPower(),
+                         box->getSubformula())->simplify();
+    }
+    
+    // S5 reduction: ◇◇φ → ◇φ
+    if (new_subformula->getType() == FDiamond) {
+        Diamond* innerDiamond = dynamic_cast<Diamond*>(new_subformula.get());
+        if (innerDiamond->getModality() == getModality()) {
+            // Recursively simplify the result
+            return Diamond::create(getModality(), getPower() + innerDiamond->getPower(),
+                                 innerDiamond->getSubformula())->simplify();
+        }
+    }
+    
+    if (new_subformula != subformula_) {
+        return Diamond::create(getModality(), getPower(), new_subformula);
     }
     return shared_from_this();
-  }
-
-  default:
-    return shared_from_this();
-  }
 }
+
 
 shared_ptr<Formula> Diamond::modalFlatten() {
   subformula_ = subformula_->modalFlatten();

@@ -58,24 +58,37 @@ shared_ptr<Formula> Box::negate() {
   return Diamond::create(modality_, power_, subformula_->negate());
 }
 
+
+// In Box::simplify()
 shared_ptr<Formula> Box::simplify() {
-  subformula_ = subformula_->simplify();
-
-  switch (subformula_->getType()) {
-  case FTrue:
-    return True::create();
-  case FBox: {
-    Box *boxFormula = dynamic_cast<Box *>(subformula_.get());
-    if (boxFormula->getModality() == modality_) {
-      power_ += boxFormula->getPower();
-      subformula_ = boxFormula->getSubformula();
+  shared_ptr<Formula> new_subformula = subformula_->simplify();
+  
+  // S5 reductions
+  if (true) {
+    // □◇φ → ◇φ
+    if (new_subformula->getType() == FDiamond) {
+      Diamond* diamond = dynamic_cast<Diamond*>(new_subformula.get());
+      return Diamond::create(diamond->getModality(),
+                           getPower() + diamond->getPower(),
+                           diamond->getSubformula())->simplify();
     }
-    return shared_from_this();
+    
+    // □□φ → □φ
+    if (new_subformula->getType() == FBox) {
+      Box* innerBox = dynamic_cast<Box*>(new_subformula.get());
+      if (innerBox->getModality() == getModality()) {
+        return Box::create(getModality(), getPower() + innerBox->getPower(),
+                         innerBox->getSubformula())->simplify();
+      }
+    }
   }
+  std::vector<int> myIntVector;
+  myIntVector.push_back(getModality());
 
-  default:
-    return shared_from_this();
+  if (subformula_ != new_subformula) {
+    return Box::create(myIntVector, new_subformula);
   }
+  return shared_from_this();
 }
 
 

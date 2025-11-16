@@ -146,7 +146,7 @@ void solve(arguments_struct &args) {
     auto read = chrono::steady_clock::now();
 #endif
 
-    shared_ptr<Formula> formula = ParseFormula(&args.filename).parseFormula();
+    shared_ptr<Formula> formula = ParseFormula(&args.filename, true).parseFormula();
     // string other = "a.p";
     // shared_ptr<Formula> correct = ParseFormula(&other).parseFormula();
     // cout << "Wrong" << formula->toString() << endl;
@@ -169,6 +169,7 @@ void solve(arguments_struct &args) {
     }
 
     formula = formula->negatedNormalForm();
+    
     // correct = correct->negatedNormalForm();
 
     // cout << (*formula == *correct) << endl;
@@ -343,7 +344,7 @@ void solve(arguments_struct &args) {
 
     {
         if (args.globalFilename != "") {
-            shared_ptr<Formula> gFormula = ParseFormula(&args.globalFilename).parseFormula();
+            shared_ptr<Formula> gFormula = ParseFormula(&args.globalFilename, true).parseFormula();
 
 
             if (args.valid) {

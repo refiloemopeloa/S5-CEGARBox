@@ -2,9 +2,9 @@
 #include <string.h>
 #include <string>
 
-ParseFormula::ParseFormula(string *str) {
+ParseFormula::ParseFormula(string *str, bool isS5) {
   ifstream formulaFile(*str);
-
+  setS5Mode(isS5);
   getline(formulaFile, s);
   file = &s;
   formulaFile.close();
@@ -20,6 +20,80 @@ char ParseFormula::getChar() {
   }
   return '%';
 }
+
+
+shared_ptr<Formula> ParseFormula::reduceS5(shared_ptr<Formula> formula) {
+  // Recursively apply S5 reductions to subformulas first
+  switch (formula->getType()) {
+    case FAnd: {
+      And* andFormula = dynamic_cast<And*>(formula.get());
+      formula_set newSubs;
+      for (auto sub : andFormula->getSubformulas()) {
+        newSubs.insert(reduceS5(sub));
+      }
+      return And::create(newSubs);
+    }
+    case FOr: {
+      Or* orFormula = dynamic_cast<Or*>(formula.get());
+      formula_set newSubs;
+      for (auto sub : orFormula->getSubformulas()) {
+        newSubs.insert(reduceS5(sub));
+      }
+      return Or::create(newSubs);
+    }
+    case FNot: {
+      Not* notFormula = dynamic_cast<Not*>(formula.get());
+      return Not::create(reduceS5(notFormula->getSubformula()));
+    }
+    case FBox:
+      return reduceS5Box(formula);
+    case FDiamond:
+      return reduceS5Diamond(formula);
+    default:
+      return formula;
+  }
+}
+
+shared_ptr<Formula> ParseFormula::reduceS5Box(shared_ptr<Formula> formula) {
+  Box* box = dynamic_cast<Box*>(formula.get());
+  shared_ptr<Formula> reducedSub = reduceS5(box->getSubformula());
+  
+  // S5 reduction: □◇φ → ◇φ
+  if (reducedSub->getType() == FDiamond) {
+    Diamond* diamond = dynamic_cast<Diamond*>(reducedSub.get());
+    return Diamond::create(diamond->getModality(), 
+                          box->getPower() + diamond->getPower(),
+                          diamond->getSubformula());
+  }
+  
+  // If subformula changed, create new box
+  if (reducedSub != box->getSubformula()) {
+    return Box::create(box->getModality(), box->getPower(), reducedSub);
+  }
+  
+  return formula;
+}
+
+shared_ptr<Formula> ParseFormula::reduceS5Diamond(shared_ptr<Formula> formula) {
+  Diamond* diamond = dynamic_cast<Diamond*>(formula.get());
+  shared_ptr<Formula> reducedSub = reduceS5(diamond->getSubformula());
+  
+  // S5 reduction: ◇□φ → □φ  
+  if (reducedSub->getType() == FBox) {
+    Box* box = dynamic_cast<Box*>(reducedSub.get());
+    return Box::create(box->getModality(),
+                      diamond->getPower() + box->getPower(),
+                      box->getSubformula());
+  }
+  
+  // If subformula changed, create new diamond
+  if (reducedSub != diamond->getSubformula()) {
+    return Diamond::create(diamond->getModality(), diamond->getPower(), reducedSub);
+  }
+  
+  return formula;
+}
+
 
 shared_ptr<Formula> ParseFormula::parseRest() {
   while (isspace(getChar()))
@@ -317,6 +391,10 @@ shared_ptr<Formula> ParseFormula::parseFormula() {
   if (getChar() != '%') {
     throw runtime_error("Unexpected character at position " + to_string(index) +
                         " got " + getChar());
+  }
+
+  if (isS5Mode) {
+    return reduceS5(formula);
   }
 
   return formula;
